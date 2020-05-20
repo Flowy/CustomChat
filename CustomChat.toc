@@ -1,8 +1,8 @@
 ## Interface: 80300
 ## Title: Custom Chat
-## Notes: Allow you to add custom text lines into your chat. For interface type /cc. More info at youtube search - CustomChat WoW Addon
+## Notes: Allow you to add custom text lines into your chat. For interface type /cc. More info at youtube search - CustomChat WoW Classic
 ## Author: Flowy
-## Version: 1.13
+## Version: 1.13.1
 ## X-Date: 2020-05
 
 embeds.xml
