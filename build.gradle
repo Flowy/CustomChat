@@ -1,0 +1,20 @@
+group 'com.flowyk.wow'
+version '1.0-SNAPSHOT'
+
+task clean(type: Delete) {
+    delete buildDir
+}
+
+task make(type: Copy) {
+    from "$projectDir"
+    include "*.toc"
+    include "*.lua"
+    include "libs/*"
+    into "$buildDir/source/$project.name"
+}
+
+task packageDistribution(type: Zip) {
+    from file("$buildDir/source")
+    archiveName "$project.name"+".zip"
+    destinationDir file("$buildDir")
+}
