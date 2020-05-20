@@ -67,8 +67,8 @@ end
 
 function CC.Show()
   local table = { GetChannelList() }
-  for i=2,#table,2 do
-    channels["c"..table[i-1]] = table[i]
+  for i=1,#table,3 do
+    channels["c"..table[i]] = table[i+1]
   end
 GUI.Widgets = {}
 GUI.Widgets.Window = GUI:Create("Window")
