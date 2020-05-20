@@ -1,9 +1,9 @@
-## Interface: 30300
-## Title: |cFF40FF40F|rCustom Chat |cff7fff7f-Ace3-|r
+## Interface: 80300
+## Title: Custom Chat
 ## Notes: Allow you to add custom text lines into your chat. For interface type /cc. More info at youtube search - CustomChat WoW Addon
 ## Author: Flowy
-## X-Date: 2011-08
-## X-Email: flowyk@gmail.com
+## Version: 1.13
+## X-Date: 2020-05
 
 embeds.xml
 core.lua
